@@ -121,17 +121,15 @@ done
 {
     echo "user $MF_USER $MF_PASS"
     echo "quote site sbd=(ibm-1047,iso8859-1)"
-
+    echo "prompt off"
+    echo "passive"
+    echo "$TRANSFER_MODE"
 
 # Loop through datasets and download all the members of each dataset
     for dataset in "${DATASETS[@]}"; do
         echo "cd '$dataset'"
         echo "lcd $BACKUP_DIR/$dataset"
-        echo "passive"
-        echo "$TRANSFER_MODE"
-        echo "prompt"
         echo "mget *"
-        echo ""
     done
 
     echo "bye"
