@@ -1,0 +1,178 @@
+#!/bin/bash
+
+print_help() {
+    cat <<EOF
+Usage: $0 [OPTIONS]
+
+Utility to backup datasets from mainframe using FTP.
+
+Options:
+  -f <configfile>   Path to config file containing credentials.
+  -l                Enable logging to file.
+  -g                Enable git commit and push operations.
+  -h                Show this help message and exit.
+
+If -f is not specified, the script will look for '.mf_backup_config' 
+in the current directory or in your home directory.
+
+Configuration file should contain:
+  - MF_HOST: Mainframe host address
+  - MF_USER: Mainframe username
+  - MF_PASS: Mainframe password
+  - BACKUP_DIR: Local directory for backups
+  - DATASETS: Array of dataset names to backup (required)
+  - ENABLE_GIT: Set to 'true' to enable git operations by default (optional)
+
+Example config file:
+  MF_HOST="mainframe1.example.com"
+  MF_USER="user001"
+  MF_PASS="123"
+  BACKUP_DIR="/my/backup/mainframe1"
+  DATASETS=(
+      "YOUR.DATASET1.NAME"
+      "YOUR.DATASET2.NAME"
+  )
+  ENABLE_GIT=false
+EOF
+    exit 1
+}
+
+# Default config file candidates
+CONFIG_FILE=".mf_backup_config"
+
+CONFIG_PROVIDED=false
+GIT_PROVIDED=false
+
+
+# These can be overridden by the command line arguments and could be
+# defined in the config file
+ENABLE_LOG=false # Enable logging to file
+ENABLE_GIT=false # Enable git operations 
+
+
+while getopts "f:lgh" opt; do
+    case $opt in
+        f) CONFIG_FILE="$OPTARG"; CONFIG_PROVIDED=true ;;
+        l) ENABLE_LOG=true ;;
+        g) ENABLE_GIT=true; GIT_PROVIDED=true ;;
+        h) print_help ;;
+        *) print_help ;;
+    esac
+done
+
+# Determine config location if not passed as argument
+if [ "$CONFIG_PROVIDED" = false ]; then
+    if [ -f "./.mf_backup_config" ]; then
+        CONFIG_FILE="./.mf_backup_config"
+    elif [ -f "$HOME/.mf_backup_config" ]; then
+        CONFIG_FILE="$HOME/.mf_backup_config"
+    else
+        echo "Error: No config file found. Use '-f' option or place .mf_backup_config
+         in current or home directory."
+        print_help
+        exit 1
+    fi
+fi
+
+# Save command line git setting before sourcing config
+GIT_CMD_LINE_VALUE="$ENABLE_GIT"
+
+# shellcheck source=/dev/null
+source "$CONFIG_FILE"
+
+# Use command line value if provided, otherwise use config file value
+if [ "$GIT_PROVIDED" = true ]; then
+    # Command line -g was used, restore that setting
+    ENABLE_GIT="$GIT_CMD_LINE_VALUE"
+elif [ -n "${ENABLE_GIT:-}" ] && [ "$ENABLE_GIT" = "true" ]; then
+    # Config file set ENABLE_GIT=true, use that value
+    :
+else
+    # Neither command line nor config file enabled it, keep default false
+    ENABLE_GIT=false
+fi
+
+# Validate that DATASETS array is defined in config file
+if [ -z "${DATASETS:-}" ] || [ ${#DATASETS[@]} -eq 0 ]; then
+    echo "Error: DATASETS array must be defined in config file."
+    echo "Please add DATASETS array to $CONFIG_FILE"
+    exit 1
+fi
+
+# Set up logging if enabled
+if [ "$ENABLE_LOG" = true ]; then
+    LOG_FILE="$BACKUP_DIR/backup_$(date +%Y%m%d_%H%M%S).log"
+    mkdir -p "$BACKUP_DIR"
+else
+    LOG_FILE=""
+fi
+
+# Create local directories for each dataset
+for dataset in "${DATASETS[@]}"; do
+    mkdir -p "$BACKUP_DIR/$dataset"
+done
+
+# FTP block 
+{
+    echo "user $MF_USER $MF_PASS"
+    echo "quote site sbd=(ibm-1047,iso8859-1)"
+
+
+# Loop through datasets and download all the members of each dataset
+    for dataset in "${DATASETS[@]}"; do
+        echo "cd '$dataset'"
+        echo "lcd $BACKUP_DIR/$dataset"
+        echo "passive"
+        echo "ascii"
+        echo "prompt"
+        echo "mget *"
+        echo ""
+    done
+
+    echo "bye"
+} | ftp -inv $MF_HOST | if [ "$ENABLE_LOG" = true ]; then tee "$LOG_FILE"; else cat; fi
+
+if [ "$ENABLE_LOG" = true ]; then
+    echo "Backup completed at $(date)" >> "$LOG_FILE"
+fi
+
+# Prepare for git operations
+cd "$BACKUP_DIR"
+
+# Commit and push backups to git (if enabled)
+if [ "$ENABLE_GIT" = true ]; then
+    if command -v git >/dev/null 2>&1; then
+        if [ -d ".git" ]; then
+            echo "Committing backups to git..."
+            git add -A
+            if git diff --staged --quiet; then
+                echo "No changes to commit."
+            else
+                COMMIT_MSG="Backup from mainframe - $(date +%Y-%m-%d\ %H:%M:%S)"
+                git commit -m "$COMMIT_MSG"
+                if [ $? -eq 0 ]; then
+                    echo "Changes committed successfully."
+                    # Push to remote if configured
+                    if git remote | grep -q .; then
+                        echo "Pushing to remote repository..."
+                        git push
+                        if [ $? -eq 0 ]; then
+                            echo "Backups pushed to remote successfully."
+                        else
+                            echo "Warning: Failed to push to remote. Check log for details."
+                        fi
+                    else
+                        echo "No remote repository configured. Skipping push."
+                    fi
+                else
+                    echo "Warning: Failed to commit changes. Check log for details."
+                fi
+            fi
+        else
+            echo "Not a git repository. Skipping git operations."
+        fi
+    else
+        echo "Git not found. Skipping git operations."
+    fi
+fi
+
