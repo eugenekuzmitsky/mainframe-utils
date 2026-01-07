@@ -10,6 +10,8 @@ Options:
   -f <configfile>   Path to config file containing credentials.
   -l                Enable logging to file.
   -g                Enable git commit and push operations.
+  -a                Use ASCII mode for file transfers (default).
+  -b                Use binary mode for file transfers.
   -h                Show this help message and exit.
 
 If -f is not specified, the script will look for 'mf_backup_config' 
@@ -42,6 +44,7 @@ CONFIG_FILE="mf_backup_config"
 
 CONFIG_PROVIDED=false
 GIT_PROVIDED=false
+TRANSFER_MODE="ascii"  # Default to ascii mode
 
 
 # These can be overridden by the command line arguments and could be
@@ -50,11 +53,13 @@ ENABLE_LOG=false # Enable logging to file
 ENABLE_GIT=false # Enable git operations 
 
 
-while getopts "f:lgh" opt; do
+while getopts "f:lgabh" opt; do
     case $opt in
         f) CONFIG_FILE="$OPTARG"; CONFIG_PROVIDED=true ;;
         l) ENABLE_LOG=true ;;
         g) ENABLE_GIT=true; GIT_PROVIDED=true ;;
+        a) TRANSFER_MODE="ascii" ;;
+        b) TRANSFER_MODE="binary" ;;
         h) print_help ;;
         *) print_help ;;
     esac
@@ -123,7 +128,7 @@ done
         echo "cd '$dataset'"
         echo "lcd $BACKUP_DIR/$dataset"
         echo "passive"
-        echo "ascii"
+        echo "$TRANSFER_MODE"
         echo "prompt"
         echo "mget *"
         echo ""
