@@ -12,7 +12,7 @@ Options:
   -g                Enable git commit and push operations.
   -h                Show this help message and exit.
 
-If -f is not specified, the script will look for '.mf_backup_config' 
+If -f is not specified, the script will look for 'mf_backup_config' 
 in the current directory or in your home directory.
 
 Configuration file should contain:
@@ -38,7 +38,7 @@ EOF
 }
 
 # Default config file candidates
-CONFIG_FILE=".mf_backup_config"
+CONFIG_FILE="mf_backup_config"
 
 CONFIG_PROVIDED=false
 GIT_PROVIDED=false
@@ -62,12 +62,12 @@ done
 
 # Determine config location if not passed as argument
 if [ "$CONFIG_PROVIDED" = false ]; then
-    if [ -f "./.mf_backup_config" ]; then
-        CONFIG_FILE="./.mf_backup_config"
-    elif [ -f "$HOME/.mf_backup_config" ]; then
-        CONFIG_FILE="$HOME/.mf_backup_config"
+    if [ -f "./mf_backup_config" ]; then
+        CONFIG_FILE="./mf_backup_config"
+    elif [ -f "$HOME/mf_backup_config" ]; then
+        CONFIG_FILE="$HOME/mf_backup_config"
     else
-        echo "Error: No config file found. Use '-f' option or place .mf_backup_config
+        echo "Error: No config file found. Use '-f' option or place mf_backup_config
          in current or home directory."
         print_help
         exit 1

@@ -1,0 +1,18 @@
+# Mainframe's address and user's credentials
+MF_HOST="mainframe1.example.com"
+MF_USER="user001"
+MF_PASS="123"
+
+# Local directory on the machine where are you backing your datasets to. 
+# It will be created if not present. Make sure you have permissions to create it.
+BACKUP_DIR="/my/backup/mainframe1"
+
+# This is datasets array. 
+DATASETS=(
+    "YOUR.DATASET1.NAME"
+    "YOUR.DATASET2.NAME"
+)
+
+# If your backup directory is a git repo, you may enable git for automated commit and push
+# your freshly downloaded datasets.
+ENABLE_GIT=false
